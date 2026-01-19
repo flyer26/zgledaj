@@ -91,6 +91,18 @@
             padding-left: env(safe-area-inset-left);
         }
 
+        /* --- BURN-IN ZAŠTITA (PIXEL SHIFT) --- */
+        @keyframes pixel-shift {
+            0% { transform: translate(0px, 0px); }
+            25% { transform: translate(2px, 1px); }
+            50% { transform: translate(0px, 2px); }
+            75% { transform: translate(-2px, 1px); }
+            100% { transform: translate(0px, 0px); }
+        }
+        .burn-in-protection {
+            animation: pixel-shift 60s infinite linear;
+        }
+
         /* --- SETUP EKRAN --- */
         #setup-screen {
             display: flex; flex-direction: column; align-items: center;
@@ -131,7 +143,6 @@
             color: var(--led-color);
             text-align: left;
         }
-        /* Hover efekt samo za uređaje koji imaju miš, da ne blica na mobitelu */
         @media (hover: hover) {
             .suggestion-item:hover {
                 background: var(--led-dim);
@@ -184,23 +195,24 @@
         h2 { text-shadow: var(--glow); margin-bottom: 20px; font-size: 4rem; font-weight: bold; letter-spacing: 5px; }
         h3 { margin: 0 0 10px 0; font-weight: normal; opacity: 0.8; font-size: 1.5rem; border-bottom: var(--border-style); padding-bottom: 5px; }
 
-        /* --- DISPLAY EKRAN --- */
+        /* --- DISPLAY EKRAN (SCROLL LOGIKA) --- */
         #display-screen {
             display: none; flex-direction: column; height: 100%;
             padding: 10px 15px; width: 100%; max-width: 1200px; margin: 0 auto;
             will-change: transform; 
             overflow-y: auto; 
-            scrollbar-width: none; 
+            scrollbar-width: none;  /* Firefox */
+            -ms-overflow-style: none;  /* IE/Edge */
         }
         #display-screen::-webkit-scrollbar { display: none; }
 
-        body.fullscreen-mode #display-screen { overflow-y: hidden; }
+        /* FULLSCREEN: Zabrani scroll osim za clean mode */
+        body.fullscreen-mode:not(.theme-clean) #display-screen { overflow-y: hidden; }
 
-        body.theme-clean #display-screen, 
-        body.fullscreen-mode.theme-clean #display-screen {
-            overflow-y: auto !important;
-            scrollbar-width: thin; 
-        }
+        /* CLEAN MODE: Uvijek scrollbar */
+        body.theme-clean #display-screen { scrollbar-width: thin; }
+        body.theme-clean #display-screen::-webkit-scrollbar { display: block; width: 8px; }
+        body.theme-clean #display-screen::-webkit-scrollbar-thumb { background-color: rgba(0,0,0,0.2); border-radius: 4px; }
 
         header {
             border-bottom: var(--header-border); margin-bottom: 5px; padding-bottom: 5px;
@@ -319,6 +331,10 @@
         <div class="setting-row">
             <label for="chk-sad">PIŠI "SAD"</label>
             <input type="checkbox" id="chk-sad" onchange="updateSettings()">
+        </div>
+        <div class="setting-row">
+            <label for="chk-burnin">BURN-IN ZAŠTITA</label>
+            <input type="checkbox" id="chk-burnin" onchange="updateSettings()">
         </div>
         <hr>
         <button class="btn" style="width:100%; color: var(--led-sched); border-color: var(--led-sched);" onclick="clearDefaultStation()">ZABORAVI FAVORIT</button>
@@ -445,6 +461,7 @@
             document.getElementById('sel-theme').value = settings.theme || 'orange';
             document.getElementById('chk-blink').checked = settings.blinking;
             document.getElementById('chk-sad').checked = settings.useSadText;
+            document.getElementById('chk-burnin').checked = settings.burnInProtection;
 
             document.getElementById('rng-rows').value = settings.maxRows || 15;
             document.getElementById('disp-rows').innerText = settings.maxRows || 15;
@@ -527,6 +544,7 @@
             settings.theme = document.getElementById('sel-theme').value;
             settings.blinking = document.getElementById('chk-blink').checked;
             settings.useSadText = document.getElementById('chk-sad').checked;
+            settings.burnInProtection = document.getElementById('chk-burnin').checked;
             
             settings.maxRows = parseInt(document.getElementById('rng-rows').value);
             document.getElementById('disp-rows').innerText = settings.maxRows;
@@ -550,6 +568,13 @@
 
             !settings.blinking ? document.body.classList.add('no-blink') : document.body.classList.remove('no-blink');
             
+            const display = document.getElementById('display-screen');
+            if(settings.burnInProtection) {
+                display.classList.add('burn-in-protection');
+            } else {
+                display.classList.remove('burn-in-protection');
+            }
+
             document.documentElement.style.setProperty('--font-scale', settings.fontSize / 100);
             document.documentElement.style.setProperty('--brightness', settings.brightness / 100);
         }
@@ -596,9 +621,8 @@
                     div.className = 'suggestion-item';
                     div.innerText = station;
                     
-                    // Koristimo mousedown/touchstart da "preduhitrimo" blur event inputa
                     const selectFn = (e) => {
-                        e.preventDefault(); // Sprječava gubitak fokusa prije klika
+                        e.preventDefault(); 
                         selectStation(station);
                     };
                     div.addEventListener('mousedown', selectFn);
@@ -626,13 +650,6 @@
                 suggestionsBox.style.display = 'none';
             }
         });
-        
-        // Stari fallback: ako korisnik pritisne Enter ili izađe iz polja
-        stationInput.addEventListener('change', async (e) => {
-           // Ovo služi samo ako nije kliknuo na listu nego stisnuo Enter
-           // ... (logika ostaje slična, ali se oslanjamo na listu)
-        });
-
 
         function locateMe() {
             if (!navigator.geolocation) {
