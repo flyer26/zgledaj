@@ -429,9 +429,38 @@
     </div>
 
     <script>
+        // --- 1. VERZIONIRANJE I AUTO-UPDATE ---
+        const CURRENT_VERSION = "1.1"; 
+        const savedVersion = localStorage.getItem('zet_app_version');
+
+        if (savedVersion !== CURRENT_VERSION) {
+            console.log("Detektirana nova verzija! Primjenjujem zakrpe...");
+            
+            // Popravi postavke (isključi blinkanje po defaultu za v1.1)
+            let existingSettings = localStorage.getItem('zet_settings');
+            if (existingSettings) {
+                let parsed = JSON.parse(existingSettings);
+                parsed.blinking = false; 
+                localStorage.setItem('zet_settings', JSON.stringify(parsed));
+            }
+
+            // Očisti stari Service Worker da povuče novi kod
+            if ('serviceWorker' in navigator) {
+                navigator.serviceWorker.getRegistrations().then(function(registrations) {
+                    for(let registration of registrations) {
+                        registration.unregister();
+                    }
+                });
+            }
+
+            localStorage.setItem('zet_app_version', CURRENT_VERSION);
+            window.location.reload();
+        }
+
+        // --- GLAVNI KOD ---
         let settings = { 
             theme: 'orange', 
-            blinking: false, // Default bez blinkanja 
+            blinking: false, 
             useSadText: false, 
             maxRows: 15, 
             fontSize: 100,
@@ -451,7 +480,6 @@
         function loadSettings() {
             const saved = localStorage.getItem('zet_settings');
             if (saved) {
-                // Merge postavki da se poštuju stare, a dodaju nove
                 settings = { ...settings, ...JSON.parse(saved) };
             }
             
@@ -595,7 +623,6 @@
             document.getElementById('clock').innerText = new Date().toLocaleTimeString('hr-HR', {hour:'2-digit', minute:'2-digit'});
         }, 1000);
 
-        // --- IZMJENA: CUSTOM DROPDOWN LISTA ---
         fetch('/api/stations').then(r => r.json()).then(data => {
             allStations = data; 
         });
@@ -603,7 +630,6 @@
         const stationInput = document.getElementById('station-input');
         const suggestionsBox = document.getElementById('custom-suggestions');
 
-        // Logika za prikaz prijedloga dok pišeš
         stationInput.addEventListener('input', (e) => {
             const val = e.target.value.trim().toLowerCase();
             suggestionsBox.innerHTML = ''; 
@@ -636,7 +662,6 @@
             }
         });
 
-        // Nova funkcija za odabir
         async function selectStation(name) {
             stationInput.value = name;
             selectedStationName = name;
@@ -644,7 +669,6 @@
             await showDirectionSelector(name);
         }
 
-        // Sakrij listu ako kliknemo izvan nje
         document.addEventListener('click', (e) => {
             if (!e.target.closest('.input-group')) {
                 suggestionsBox.style.display = 'none';
@@ -664,7 +688,7 @@
                     const res = await fetch(`/api/nearest?lat=${position.coords.latitude}&lon=${position.coords.longitude}`);
                     const data = await res.json();
                     if (data.name) {
-                        selectStation(data.name); // Koristimo novu funkciju
+                        selectStation(data.name); 
                     } else {
                         alert("Nema stanice u blizini (5km).");
                         stationInput.placeholder = "UPIŠI STANICU...";
@@ -778,7 +802,6 @@
             }
         });
 
-        // --- PRAĆENJE VIDLJIVOSTI (ŠTEDNJA BATERIJE) ---
         document.addEventListener("visibilitychange", () => {
             if (document.hidden) {
                 if (fetchInterval) clearInterval(fetchInterval);
