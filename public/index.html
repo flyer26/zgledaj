@@ -2,7 +2,7 @@
 <html lang="hr">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
     <title>ZGLEDAJ</title>
     
     <link rel="manifest" href="/manifest.json">
@@ -17,6 +17,7 @@
 <style>
         /* --- TEME I BOJE --- */
         :root {
+            /* Default - ORANGE */
             --led-color: #ffaa00;
             --led-sched: #b37700;
             --led-dim: #2a1a00;
@@ -28,18 +29,21 @@
             --brightness: 1.0; 
             --border-style: 1px dashed var(--led-dim);
             --header-border: 3px solid var(--led-color);
+            --bg-image: radial-gradient(var(--led-dim) 30%, transparent 35%);
         }
 
-        body.green-mode {
+        /* ZELENA TEMA */
+        body.theme-green {
             --led-color: #c0e020;
             --led-sched: #50600a;
             --led-dim: #1a2200;
             --glow: none;       
-            --glow-sched: none; 
+            --glow-sched: none;
+            --header-border: 3px solid #c0e020; 
         }
 
-        /* --- CLEAN MODE (PREGLEDNA TABLICA) --- */
-        body.clean-mode {
+        /* CLEAN MODE (PREGLEDNA TABLICA) */
+        body.theme-clean {
             --led-color: #000000;
             --led-sched: #666666;
             --led-dim: #eeeeee;
@@ -49,12 +53,12 @@
             --font-main: 'Roboto', sans-serif;
             --border-style: 1px solid #ddd;
             --header-border: 3px solid #000;
-            background-image: none !important;
+            --bg-image: none;
             text-shadow: none !important;
         }
         
         @media (prefers-color-scheme: dark) {
-            body.clean-mode {
+            body.theme-clean {
                 --led-color: #ffffff;
                 --led-sched: #aaaaaa;
                 --led-dim: #333333;
@@ -75,11 +79,18 @@
             display: flex;
             flex-direction: column;
             overflow: hidden;
-            background-image: radial-gradient(var(--led-dim) 30%, transparent 35%);
+            background-image: var(--bg-image);
             background-size: 4px 4px;
             text-shadow: var(--glow);
             transition: color 0.3s, background 0.3s;
             filter: brightness(var(--brightness));
+
+            /* --- SAFE AREA FIX (NOTCH) --- */
+            /* Ovo osigurava da se sadržaj odmakne od rubova ekrana */
+            padding-top: env(safe-area-inset-top);
+            padding-right: env(safe-area-inset-right);
+            padding-bottom: env(safe-area-inset-bottom);
+            padding-left: env(safe-area-inset-left);
         }
 
         /* --- SETUP EKRAN --- */
@@ -88,7 +99,10 @@
             height: 100%; background: var(--bg-color); z-index: 100; position: absolute; width: 100%; top: 0;
             background-image: inherit; 
             background-size: inherit;
-            overflow-y: auto; padding: 40px 20px;
+            overflow-y: auto; 
+            
+            /* Dodajemo padding na padding koji već body ima, da setup ne bude zalijepljen */
+            padding: 40px 20px; 
         }
         
         .input-group { position: relative; width: 80%; max-width: 500px; margin-bottom: 20px; display: flex; gap: 10px; }
@@ -127,9 +141,19 @@
             cursor: pointer; font-family: inherit; font-weight: bold;
             box-shadow: var(--glow); margin-bottom: 30px;
         }
+
+        #btn-quick-fav {
+            display: none; width: 80%; max-width: 500px; margin-bottom: 20px;
+            padding: 15px; font-size: 1.5rem; 
+            background: transparent; color: var(--led-color); 
+            border: 2px solid var(--led-color); cursor: pointer;
+            font-family: inherit; text-transform: uppercase;
+            box-shadow: var(--glow); text-align: center;
+        }
+        #btn-quick-fav:hover { background: rgba(255,255,255,0.1); }
         
         .disclaimer {
-            margin-top: auto; padding: 20px 0; font-size: 0.9rem; opacity: 0.6; text-align: center; 
+            margin-top: auto; padding: 20px 0; font-size: 0.8rem; opacity: 0.5; text-align: center; 
             color: var(--led-color); border-top: var(--border-style); width: 80%;
         }
 
@@ -141,6 +165,17 @@
             display: none; flex-direction: column; height: 100%;
             padding: 10px 15px; width: 100%; max-width: 1200px; margin: 0 auto;
             will-change: transform; 
+            overflow-y: auto; 
+            scrollbar-width: none; 
+        }
+        #display-screen::-webkit-scrollbar { display: none; }
+
+        body.fullscreen-mode #display-screen { overflow-y: hidden; }
+
+        body.theme-clean #display-screen, 
+        body.fullscreen-mode.theme-clean #display-screen {
+            overflow-y: auto !important;
+            scrollbar-width: thin; 
         }
 
         header {
@@ -156,9 +191,7 @@
         body.no-blink .blink { animation: none; opacity: 1; }
 
         table { width: 100%; border-collapse: collapse; table-layout: fixed; }
-        th, td {
-            white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0; line-height: 1.1;
-        }
+        th, td { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding: 0; line-height: 1.1; }
         th { 
             text-align: left; font-size: calc(1.5rem * var(--font-scale)); 
             color: var(--led-color); opacity: 0.7; padding-bottom: 5px; 
@@ -166,15 +199,31 @@
         }
         td { font-size: calc(clamp(2.5rem, 6vw, 6rem) * var(--font-scale)); }
 
-        th:nth-child(1), td:nth-child(1) { width: 15%; text-align: left; }
-        th:nth-child(2), td:nth-child(2) { width: 60%; text-align: left; }
-        th:nth-child(3), td:nth-child(3) { width: 25%; text-align: right; }
+        body.theme-clean td {
+            font-size: calc(clamp(1.2rem, 4vw, 2.5rem) * var(--font-scale)) !important;
+            padding: 8px 0; border-bottom: 1px solid rgba(128,128,128,0.2); 
+        }
+        body.theme-clean th { font-size: calc(1.0rem * var(--font-scale)) !important; }
+
+        th:nth-child(1), td:nth-child(1) { width: 15%; min-width: 50px; text-align: left; }
+        th:nth-child(3), td:nth-child(3) { width: 25%; min-width: 80px; text-align: right; }
+        th:nth-child(2), td:nth-child(2) { width: auto; text-align: left; }
 
         tr.sched td { color: var(--led-sched); text-shadow: var(--glow-sched); }
         tr.sched .vrijeme::after { content: "*"; position: relative; top: -5px; font-size: 0.6em; opacity: 0.8; margin-left: 2px; }
 
-        /* --- KONTROLE --- */
-        .corner-controls { position: fixed; top: 10px; right: 10px; display: flex; gap: 10px; z-index: 200; }
+        /* --- KONTROLE I NOTCH FIX --- */
+        .corner-controls { 
+            position: fixed; 
+            /* Koristimo calc() da dodamo 10px na sigurno područje */
+            top: calc(10px + env(safe-area-inset-top)); 
+            right: calc(10px + env(safe-area-inset-right)); 
+            display: flex; gap: 10px; z-index: 200; 
+            opacity: 1; visibility: visible; transition: opacity 0.5s ease, visibility 0.5s ease;
+        }
+        .corner-controls.idle { opacity: 0; visibility: hidden; pointer-events: none; }
+        body.fullscreen-mode .corner-controls { display: none !important; }
+
         .btn { 
             background: var(--bg-color); border: 1px solid var(--led-color); color: var(--led-color); 
             cursor: pointer; font-size: 1.2rem; padding: 5px 10px; font-family: inherit; 
@@ -182,69 +231,51 @@
         }
         .btn:hover { background: var(--led-dim); }
 
-        /* --- SETTINGS PANEL (POPRAVLJENO SKROLANJE) --- */
+        /* --- SETTINGS PANEL --- */
         #settings-panel {
-            display: none; position: absolute; top: 50px; right: 10px; 
+            display: none; position: absolute; 
+            /* I panel treba paziti na notch */
+            top: calc(50px + env(safe-area-inset-top)); 
+            right: calc(10px + env(safe-area-inset-right)); 
+            
             background: var(--bg-color); border: 2px solid var(--led-color); padding: 15px;
             z-index: 201; flex-direction: column; gap: 15px; width: 320px;
             box-shadow: var(--glow);
-            /* KLJUČNO: Ograniči visinu i omogući skrolanje ako ne stane na ekran */
-            max-height: 85vh; 
-            overflow-y: auto;
-            -webkit-overflow-scrolling: touch; /* Glatko skrolanje na iPhoneu */
+            max-height: 85vh; overflow-y: auto; -webkit-overflow-scrolling: touch; 
         }
         .setting-row { display: flex; justify-content: space-between; align-items: center; font-size: 1.2rem; }
         .setting-col { display: flex; flex-direction: column; gap: 5px; }
         label { cursor: pointer; }
         input[type="range"] { width: 100%; accent-color: var(--led-color); cursor: pointer; }
+        
+        select {
+            background: var(--bg-color); color: var(--led-color); border: 1px solid var(--led-color);
+            padding: 5px; font-family: inherit; font-size: 1rem; width: 150px; text-align: right;
+        }
+
         .val-display { font-size: 1rem; opacity: 0.8; margin-left: 10px; }
         hr { width: 100%; border: 0; border-top: var(--border-style); margin: 0; }
         #msg-box { text-align: center; font-size: 2rem; margin-top: 20vh; color: var(--led-dim); display: none; text-shadow: none; }
 
-        /* --- MOBITEL FIX (GUMBI IZNAD TEKSTA) --- */
         @media (max-width: 1000px) {
             .corner-controls {
-                /* STATIC: Fizički zauzima prostor i gura sve ispod sebe */
-                position: static !important; 
-                width: 100% !important; 
-                
-                /* FLEX bez !important da Fullscreen može sakriti */
-                display: flex; 
-                
-                justify-content: flex-end !important; 
-                padding: 10px !important; 
-                
-                /* Osiguravamo da se ne vidi tekst ispod gumba */
-                background-color: var(--bg-color); 
-                margin-bottom: 5px !important;
-                z-index: 9999; 
-                flex-shrink: 0;
+                position: static !important; width: 100% !important; display: flex; 
+                justify-content: flex-end !important; padding: 10px !important; 
+                background-color: var(--bg-color); margin-bottom: 5px !important;
+                z-index: 9999; flex-shrink: 0;
             }
             .btn { font-size: 1.1rem; padding: 6px 12px; margin-left: 5px; }
-            
-            /* Osiguravamo da display uzme preostali prostor i skrola interno */
             #display-screen { height: auto !important; flex: 1 !important; padding-top: 0 !important; overflow: hidden; }
             #setup-screen { top: auto !important; position: relative !important; padding-top: 20px; }
-            
-            /* Settings na mobitelu - malo širi */
-            #settings-panel {
-                width: 90%;
-                right: 5%;
-                top: 60px; /* Odmak od gumba */
-            }
+            #settings-panel { width: 90%; right: 5%; top: 60px; }
         }
-
-        /* --- SAKRIVANJE GUMBA U FULLSCREENU (OVO SAD RADI) --- */
-        :fullscreen .corner-controls, 
-        :-webkit-full-screen .corner-controls, 
-        :-moz-full-screen .corner-controls { 
-            display: none !important; 
-        }
+        
+        :fullscreen .corner-controls, :-webkit-full-screen .corner-controls, :-moz-full-screen .corner-controls { display: none !important; }
     </style>
 </head>
 <body>
 
-    <div class="corner-controls">
+    <div class="corner-controls" id="main-controls">
         <button class="btn" onclick="toggleSettings()">OPCIJE</button>
         <button class="btn" onclick="toggleFullScreen()">FULLSCREEN</button>
         <button class="btn" onclick="exitKiosk()">X</button>
@@ -252,12 +283,12 @@
 
     <div id="settings-panel">
         <div class="setting-row">
-            <label for="chk-clean">PREGLEDNA TABLICA</label>
-            <input type="checkbox" id="chk-clean" onchange="updateSettings()">
-        </div>
-        <div class="setting-row">
-            <label for="chk-green">ZELENI EKRAN</label>
-            <input type="checkbox" id="chk-green" onchange="updateSettings()">
+            <label for="sel-theme">DIZAJN EKRANA:</label>
+            <select id="sel-theme" onchange="updateSettings()">
+                <option value="orange">NARANČASTI LED</option>
+                <option value="green">ZELENI DOT</option>
+                <option value="clean">PREGLEDNA TABLICA</option>
+            </select>
         </div>
         <div class="setting-row">
             <label for="chk-blink">BLINKANJE</label>
@@ -304,6 +335,8 @@
             <datalist id="stations-list"></datalist>
         </div>
         
+        <button id="btn-quick-fav" onclick="launchFavorite()">⭐ UČITAVAM...</button>
+
         <div id="direction-selector" class="option-box">
             <h3>SMJEROVI:</h3>
             <div id="checkbox-container"></div>
@@ -332,7 +365,8 @@
         <button id="btn-start" onclick="finalizeSetup()">POKRENI DISPLAY</button>
         
         <div class="disclaimer">
-            Nezavisna aplikacija. Autor ne odgovara za točnost podataka.
+            Nezavisna aplikacija. Autor ne odgovara za točnost podataka.<br>
+            Podaci o stanicama i postavkama spremaju se isključivo lokalno na vaš uređaj.
         </div>
     </div>
 
@@ -356,10 +390,9 @@
 
     <script>
         let settings = { 
-            cleanMode: false,
-            greenMode: false, 
-            blinking: true, 
-            useSadText: false, 
+            theme: 'orange',        // Default: Narančasti ekran
+            blinking: false,        // Default: BEZ blinkanja (prije je bilo true)
+            useSadText: false,      // Default: Bez "SAD" teksta
             maxRows: 15, 
             fontSize: 100,
             showTrams: true,
@@ -371,48 +404,108 @@
         let allStations = []; 
         let activeFilters = []; 
         let selectedStationName = ""; 
+        let idleTimer; 
+        let favoriteStation = null;
+        let fetchInterval = null; 
 
-        function loadSettings() {
+function loadSettings() {
             const saved = localStorage.getItem('zet_settings');
-            if (saved) settings = JSON.parse(saved);
+            if (saved) {
+                // Ovdje radimo "merge": Uzmi nove defaulte i prelij preko njih ono što je korisnik spremio.
+                // Tako ako je korisnik ranije uključio blinkanje, ostat će mu uključeno.
+                // A ako je novi korisnik, imat će isključeno (kako je gore definirano).
+                settings = { ...settings, ...JSON.parse(saved) };
+            }
             
-            // UI Update
-            document.getElementById('chk-clean').checked = settings.cleanMode;
-            document.getElementById('chk-green').checked = settings.greenMode;
+            // Čišćenje starih naziva varijabli (backward compatibility)
+            if (settings.cleanMode) { settings.theme = 'clean'; delete settings.cleanMode; }
+            if (settings.greenMode) { settings.theme = 'green'; delete settings.greenMode; }
+
+            // UI Update (namještanje gumba prema postavkama)
+            document.getElementById('sel-theme').value = settings.theme || 'orange';
             document.getElementById('chk-blink').checked = settings.blinking;
             document.getElementById('chk-sad').checked = settings.useSadText;
 
-            // Sliders
+            // Sliders Update
             document.getElementById('rng-rows').value = settings.maxRows || 15;
             document.getElementById('disp-rows').innerText = settings.maxRows || 15;
-            
             document.getElementById('rng-font').value = settings.fontSize || 100;
             document.getElementById('disp-font').innerText = (settings.fontSize || 100) + "%";
-
             document.getElementById('rng-bright').value = settings.brightness || 100;
             document.getElementById('disp-bright').innerText = (settings.brightness || 100) + "%";
             
             applyStyles();
-            checkAutoLogin();
+            checkFavorite();
+            resetIdleTimer(); 
         }
 
-        function checkAutoLogin() {
-            const savedStation = localStorage.getItem('zet_favorite_station');
-            const urlStation = new URLSearchParams(window.location.search).get('station');
+        function checkFavorite() {
+            const savedFav = localStorage.getItem('zet_favorite_station');
+            const btnFav = document.getElementById('btn-quick-fav');
+            
+            if (savedFav) {
+                favoriteStation = JSON.parse(savedFav);
+                btnFav.style.display = 'block';
+                btnFav.innerText = "⭐ BRZI START: " + favoriteStation.name;
+                
+                const urlStation = new URLSearchParams(window.location.search).get('station');
+                if (urlStation) {
+                    selectedStationName = favoriteStation.name;
+                    activeFilters = favoriteStation.filters || [];
+                    if(favoriteStation.showTrams !== undefined) settings.showTrams = favoriteStation.showTrams;
+                    if(favoriteStation.showBuses !== undefined) settings.showBuses = favoriteStation.showBuses;
+                    enterKiosk(selectedStationName);
+                }
+            } else {
+                btnFav.style.display = 'none';
+            }
+        }
 
-            if (!urlStation && savedStation) {
-                const fav = JSON.parse(savedStation);
-                selectedStationName = fav.name;
-                activeFilters = fav.filters;
-                settings.showTrams = fav.showTrams;
-                settings.showBuses = fav.showBuses;
+        function launchFavorite() {
+            if (favoriteStation) {
+                selectedStationName = favoriteStation.name;
+                activeFilters = favoriteStation.filters || [];
+                settings.showTrams = favoriteStation.showTrams;
+                settings.showBuses = favoriteStation.showBuses;
+                
+                document.getElementById('setup-chk-trams').checked = settings.showTrams;
+                document.getElementById('setup-chk-buses').checked = settings.showBuses;
+                
+                updateSettings(false);
+                
+                let newUrl = `?station=${encodeURIComponent(selectedStationName)}`;
+                if (activeFilters.length > 0) newUrl += `&filter=${encodeURIComponent(activeFilters.join(','))}`;
+                window.history.pushState({}, '', newUrl);
+                
                 enterKiosk(selectedStationName);
             }
         }
 
-        function updateSettings() {
-            settings.cleanMode = document.getElementById('chk-clean').checked;
-            settings.greenMode = document.getElementById('chk-green').checked;
+        function clearDefaultStation() {
+            localStorage.removeItem('zet_favorite_station');
+            favoriteStation = null;
+            document.getElementById('btn-quick-fav').style.display = 'none';
+            alert("Favorit obrisan.");
+            toggleSettings();
+        }
+
+        function resetIdleTimer() {
+            if (document.body.classList.contains('fullscreen-mode')) return;
+            const controls = document.getElementById('main-controls');
+            controls.classList.remove('idle');
+            clearTimeout(idleTimer);
+            idleTimer = setTimeout(() => {
+                document.getElementById('settings-panel').style.display = 'none';
+                controls.classList.add('idle');
+            }, 5000);
+        }
+
+        ['mousemove', 'mousedown', 'touchstart', 'click', 'keydown'].forEach(evt => 
+            document.addEventListener(evt, resetIdleTimer)
+        );
+
+        function updateSettings(shouldRender = true) {
+            settings.theme = document.getElementById('sel-theme').value;
             settings.blinking = document.getElementById('chk-blink').checked;
             settings.useSadText = document.getElementById('chk-sad').checked;
             
@@ -428,12 +521,14 @@
             localStorage.setItem('zet_settings', JSON.stringify(settings));
             applyStyles();
             
-            if(window.lastData) renderBoard(window.lastData);
+            if(shouldRender && window.lastData) renderBoard(window.lastData);
         }
 
         function applyStyles() {
-            settings.cleanMode ? document.body.classList.add('clean-mode') : document.body.classList.remove('clean-mode');
-            settings.greenMode ? document.body.classList.add('green-mode') : document.body.classList.remove('green-mode');
+            document.body.classList.remove('theme-green', 'theme-clean');
+            if (settings.theme === 'green') document.body.classList.add('theme-green');
+            if (settings.theme === 'clean') document.body.classList.add('theme-clean');
+
             !settings.blinking ? document.body.classList.add('no-blink') : document.body.classList.remove('no-blink');
             
             document.documentElement.style.setProperty('--font-scale', settings.fontSize / 100);
@@ -443,6 +538,7 @@
         function toggleSettings() {
             const panel = document.getElementById('settings-panel');
             panel.style.display = (panel.style.display === 'flex') ? 'none' : 'flex';
+            resetIdleTimer();
         }
 
         const urlParams = new URLSearchParams(window.location.search);
@@ -471,7 +567,6 @@
         stationInput.addEventListener('change', async (e) => {
             const val = e.target.value.trim(); 
             if(!val) return;
-            // Fleksibilna pretraga
             let validStation = allStations.find(s => s.toLowerCase() === val.toLowerCase());
             if (!validStation) validStation = allStations.find(s => s.toLowerCase().includes(val.toLowerCase()));
 
@@ -486,18 +581,18 @@
             }
         });
 
-        // --- LOCIRAJ ME ---
         function locateMe() {
             if (!navigator.geolocation) {
-                alert("Geolokacija nije podržana u ovom pregledniku.");
+                alert("Geolokacija nije podržana.");
                 return;
             }
             stationInput.placeholder = "TRAŽIM...";
+            const options = { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 };
+
             navigator.geolocation.getCurrentPosition(async (position) => {
                 try {
                     const res = await fetch(`/api/nearest?lat=${position.coords.latitude}&lon=${position.coords.longitude}`);
                     const data = await res.json();
-                    
                     if (data.name) {
                         selectedStationName = data.name;
                         stationInput.value = data.name;
@@ -510,10 +605,12 @@
                     console.error(e);
                     stationInput.placeholder = "GREŠKA";
                 }
-            }, () => {
-                alert("Nije moguće dohvatiti lokaciju.");
+            }, (error) => {
+                let msg = "Greška lokacije.";
+                if(window.location.protocol !== 'https:' && window.location.hostname !== 'localhost') msg += " (Mora biti HTTPS)";
+                alert(msg);
                 stationInput.placeholder = "UPIŠI STANICU...";
-            });
+            }, options);
         }
 
         async function showDirectionSelector(stationName) {
@@ -544,7 +641,7 @@
                 
                 document.getElementById('direction-selector').style.display = 'flex';
                 document.getElementById('vehicle-selector').style.display = 'flex';
-                document.getElementById('favorite-box').style.display = 'flex'; // Prikaži opciju za favorit
+                document.getElementById('favorite-box').style.display = 'flex'; 
                 document.getElementById('btn-start').style.display = 'block';
 
             } catch (e) { console.error(e); }
@@ -556,9 +653,8 @@
             
             settings.showTrams = document.getElementById('setup-chk-trams').checked;
             settings.showBuses = document.getElementById('setup-chk-buses').checked;
-            localStorage.setItem('zet_settings', JSON.stringify(settings));
+            updateSettings(false);
 
-            // SPREMI FAVORIT AKO JE OZNAČENO
             if (document.getElementById('chk-save-fav').checked) {
                 const fav = {
                     name: selectedStationName,
@@ -567,6 +663,7 @@
                     showBuses: settings.showBuses
                 };
                 localStorage.setItem('zet_favorite_station', JSON.stringify(fav));
+                checkFavorite(); 
             }
             
             let newUrl = `?station=${encodeURIComponent(selectedStationName)}`;
@@ -574,12 +671,6 @@
             
             window.history.pushState({}, '', newUrl);
             enterKiosk(selectedStationName);
-        }
-
-        function clearDefaultStation() {
-            localStorage.removeItem('zet_favorite_station');
-            alert("Favorit obrisan. Idući put će se otvoriti izbornik.");
-            toggleSettings();
         }
 
         function enterKiosk(stationName) {
@@ -595,14 +686,52 @@
         }
 
         function exitKiosk() { 
-            // Ako izađemo, brišemo query parametre da se ne vrati odmah
+            if (fetchInterval) clearInterval(fetchInterval);
+            
             window.history.pushState({}, '', window.location.pathname);
-            window.location.reload();
+            document.getElementById('display-screen').style.display = 'none';
+            document.getElementById('setup-screen').style.display = 'flex';
+            document.title = "ZGLEDAJ";
         }
 
-        function toggleFullScreen() { !document.fullscreenElement ? document.documentElement.requestFullscreen() : document.exitFullscreen(); }
+        function toggleFullScreen() { 
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen();
+                document.body.classList.add('fullscreen-mode');
+            } else {
+                document.exitFullscreen();
+                document.body.classList.remove('fullscreen-mode');
+            }
+        }
+        
+        document.addEventListener('fullscreenchange', () => {
+            if (!document.fullscreenElement) {
+                document.body.classList.remove('fullscreen-mode');
+            }
+        });
+
+// --- PRAĆENJE VIDLJIVOSTI (ŠTEDNJA BATERIJE) ---
+        document.addEventListener("visibilitychange", () => {
+            if (document.hidden) {
+                // Tab u pozadini -> gasi osvježavanje
+                if (fetchInterval) clearInterval(fetchInterval);
+            } else {
+                // Tab opet aktivan -> ako smo na displayu, odmah osvježi
+                if (document.getElementById('display-screen').style.display === 'flex') {
+                    const stationToRefresh = selectedStationName || document.getElementById('station-title').innerText;
+                    if (stationToRefresh && stationToRefresh !== "...") {
+                        startBoard(stationToRefresh);
+                    }
+                }
+            }
+        });
 
         function startBoard(stationName) {
+            if (fetchInterval) clearInterval(fetchInterval);
+            
+            // Važno: Ažuriraj globalnu varijablu da resume zna što učitati
+            selectedStationName = stationName;
+
             const fetchData = async () => {
                 try {
                     const res = await fetch(`/api/board?station=${encodeURIComponent(stationName)}`);
@@ -612,7 +741,7 @@
                 } catch(e) { console.error(e); }
             };
             fetchData();
-            setInterval(fetchData, 10000);
+            fetchInterval = setInterval(fetchData, 10000);
         }
 
         function isTram(linija) {
