@@ -837,13 +837,31 @@
             return num < 100;
         }
 
-        function renderBoard(data) {
+function renderBoard(data) {
             const tbody = document.getElementById('board');
             tbody.innerHTML = '';
             
-            let filteredData = data;
+            // --- 1. FILTRIRANJE DUPLIKATA (NOVO) ---
+            // Ponekad ZET šalje iste linije dvaput. Ovo ih čisti.
+            const uniqueData = [];
+            const seen = new Set();
+
+            data.forEach(d => {
+                // Stvaramo jedinstveni "potpis" za svaki red (Linija + Smjer + Vrijeme)
+                const signature = `${d.linija}-${d.smjer}-${d.time}-${d.min}`;
+                
+                if (!seen.has(signature)) {
+                    seen.add(signature);
+                    uniqueData.push(d);
+                }
+            });
+            // Sada koristimo očišćenu listu (uniqueData) umjesto sirove (data)
+            
+            let filteredData = uniqueData; 
+            
+            // --- 2. FILTRIRANJE PO TVOJIM POSTAVKAMA ---
             if (activeFilters.length > 0) {
-                filteredData = data.filter(d => activeFilters.includes(d.smjer));
+                filteredData = filteredData.filter(d => activeFilters.includes(d.smjer));
             }
 
             filteredData = filteredData.filter(d => {
@@ -853,9 +871,10 @@
                 return false;
             });
 
+            // --- 3. PRIKAZ ---
             if (filteredData.length === 0) {
                 document.getElementById('msg-box').style.display = 'block';
-                if (data.length > 0) {
+                if (uniqueData.length > 0) {
                     document.getElementById('msg-box').innerText = "NEMA ODABRANIH VOZILA";
                 } else {
                     document.getElementById('msg-box').innerText = "NEMA NAJAVA";
