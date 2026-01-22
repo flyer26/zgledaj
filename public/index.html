@@ -177,15 +177,32 @@
             box-shadow: var(--glow); margin-bottom: 30px;
         }
 
-        #btn-quick-fav {
-            display: none; width: 80%; max-width: 500px; margin-bottom: 20px;
-            padding: 15px; font-size: 1.5rem; 
+        /* --- FAVORITI LISTA STIL --- */
+        #favorites-container {
+            width: 80%; max-width: 500px; margin-bottom: 20px;
+            display: none; flex-direction: column; gap: 10px;
+        }
+        .fav-item {
+            display: flex; gap: 10px;
+        }
+        .fav-launch {
+            flex-grow: 1; padding: 15px; font-size: 1.5rem; 
             background: transparent; color: var(--led-color); 
             border: 2px solid var(--led-color); cursor: pointer;
             font-family: inherit; text-transform: uppercase;
-            box-shadow: var(--glow); text-align: center;
+            box-shadow: var(--glow); text-align: left;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
         }
-        #btn-quick-fav:hover { background: rgba(255,255,255,0.1); }
+        .fav-launch:hover { background: rgba(255,255,255,0.1); }
+        
+        .fav-delete {
+            width: 50px; font-size: 1.5rem;
+            background: transparent; color: var(--led-color);
+            border: 2px solid var(--led-color); cursor: pointer;
+            font-family: inherit; box-shadow: var(--glow);
+            display: flex; align-items: center; justify-content: center;
+        }
+        .fav-delete:hover { background: rgba(255,0,0,0.3); color: #ff5555; border-color: #ff5555; }
         
         .disclaimer {
             margin-top: auto; padding: 20px 0; font-size: 0.8rem; opacity: 0.5; text-align: center; 
@@ -337,7 +354,7 @@
             <input type="checkbox" id="chk-burnin" onchange="updateSettings()">
         </div>
         <hr>
-        <button class="btn" style="width:100%; color: var(--led-sched); border-color: var(--led-sched);" onclick="clearDefaultStation()">ZABORAVI FAVORIT</button>
+        <button class="btn" style="width:100%; color: var(--led-sched); border-color: var(--led-sched);" onclick="clearAllFavorites()">OBRIŠI SVE FAVORITE</button>
         <hr>
         <div class="setting-col">
             <div style="display:flex; justify-content:space-between;">
@@ -375,7 +392,7 @@
             <div id="custom-suggestions" class="suggestions-box"></div>
         </div>
         
-        <button id="btn-quick-fav" onclick="launchFavorite()">⭐ UČITAVAM...</button>
+        <div id="favorites-container"></div>
 
         <div id="direction-selector" class="option-box">
             <h3>SMJEROVI:</h3>
@@ -430,7 +447,7 @@
 
     <script>
         // --- 1. VERZIONIRANJE I AUTO-UPDATE ---
-        const CURRENT_VERSION = "1.1"; 
+        const CURRENT_VERSION = "1.2"; 
         const savedVersion = localStorage.getItem('zet_app_version');
 
         if (savedVersion !== CURRENT_VERSION) {
@@ -474,7 +491,7 @@
         let activeFilters = []; 
         let selectedStationName = ""; 
         let idleTimer; 
-        let favoriteStation = null;
+        let favoritesList = []; // Nova lista favorita
         let fetchInterval = null; 
 
         function loadSettings() {
@@ -499,38 +516,66 @@
             document.getElementById('disp-bright').innerText = (settings.brightness || 100) + "%";
             
             applyStyles();
-            checkFavorite();
+            loadFavorites(); // Učitaj listu favorita
             resetIdleTimer(); 
         }
 
-        function checkFavorite() {
-            const savedFav = localStorage.getItem('zet_favorite_station');
-            const btnFav = document.getElementById('btn-quick-fav');
-            
-            if (savedFav) {
-                favoriteStation = JSON.parse(savedFav);
-                btnFav.style.display = 'block';
-                btnFav.innerText = "⭐ BRZI START: " + favoriteStation.name;
-                
-                const urlStation = new URLSearchParams(window.location.search).get('station');
-                if (urlStation) {
-                    selectedStationName = favoriteStation.name;
-                    activeFilters = favoriteStation.filters || [];
-                    if(favoriteStation.showTrams !== undefined) settings.showTrams = favoriteStation.showTrams;
-                    if(favoriteStation.showBuses !== undefined) settings.showBuses = favoriteStation.showBuses;
-                    enterKiosk(selectedStationName);
-                }
+        function loadFavorites() {
+            // MIGRACIJA: Ako postoji stari "jedan" favorit, prebaci ga u listu
+            const oldFav = localStorage.getItem('zet_favorite_station');
+            const newList = localStorage.getItem('zet_favorites_list');
+
+            if (oldFav && !newList) {
+                favoritesList = [JSON.parse(oldFav)];
+                localStorage.setItem('zet_favorites_list', JSON.stringify(favoritesList));
+                localStorage.removeItem('zet_favorite_station'); // Obriši stari
+            } else if (newList) {
+                favoritesList = JSON.parse(newList);
             } else {
-                btnFav.style.display = 'none';
+                favoritesList = [];
+            }
+
+            renderFavoritesUI();
+        }
+
+        function renderFavoritesUI() {
+            const container = document.getElementById('favorites-container');
+            container.innerHTML = '';
+
+            if (favoritesList.length > 0) {
+                container.style.display = 'flex';
+                favoritesList.forEach((fav, index) => {
+                    const row = document.createElement('div');
+                    row.className = 'fav-item';
+
+                    // Gumb za pokretanje
+                    const btn = document.createElement('button');
+                    btn.className = 'fav-launch';
+                    btn.innerHTML = "⭐ " + fav.name;
+                    btn.onclick = () => launchFavorite(index);
+
+                    // Gumb za brisanje (X)
+                    const delBtn = document.createElement('button');
+                    delBtn.className = 'fav-delete';
+                    delBtn.innerHTML = "X";
+                    delBtn.onclick = () => deleteFavorite(index);
+
+                    row.appendChild(btn);
+                    row.appendChild(delBtn);
+                    container.appendChild(row);
+                });
+            } else {
+                container.style.display = 'none';
             }
         }
 
-        function launchFavorite() {
-            if (favoriteStation) {
-                selectedStationName = favoriteStation.name;
-                activeFilters = favoriteStation.filters || [];
-                settings.showTrams = favoriteStation.showTrams;
-                settings.showBuses = favoriteStation.showBuses;
+        function launchFavorite(index) {
+            const fav = favoritesList[index];
+            if (fav) {
+                selectedStationName = fav.name;
+                activeFilters = fav.filters || [];
+                settings.showTrams = fav.showTrams;
+                settings.showBuses = fav.showBuses;
                 
                 document.getElementById('setup-chk-trams').checked = settings.showTrams;
                 document.getElementById('setup-chk-buses').checked = settings.showBuses;
@@ -545,12 +590,23 @@
             }
         }
 
-        function clearDefaultStation() {
-            localStorage.removeItem('zet_favorite_station');
-            favoriteStation = null;
-            document.getElementById('btn-quick-fav').style.display = 'none';
-            alert("Favorit obrisan.");
-            toggleSettings();
+        function deleteFavorite(index) {
+            if (confirm("Obrisati ovaj favorit?")) {
+                favoritesList.splice(index, 1); // Izbaci iz niza
+                localStorage.setItem('zet_favorites_list', JSON.stringify(favoritesList));
+                renderFavoritesUI();
+            }
+        }
+
+        function clearAllFavorites() {
+            if (confirm("Sigurno želiš obrisati SVE favorite?")) {
+                favoritesList = [];
+                localStorage.removeItem('zet_favorites_list');
+                localStorage.removeItem('zet_favorite_station');
+                renderFavoritesUI();
+                alert("Svi favoriti obrisani.");
+                toggleSettings();
+            }
         }
 
         function resetIdleTimer() {
@@ -747,15 +803,34 @@
             settings.showBuses = document.getElementById('setup-chk-buses').checked;
             updateSettings(false);
 
+            // --- LOGIKA ZA SPREMANJE FAVORITA ---
             if (document.getElementById('chk-save-fav').checked) {
-                const fav = {
+                const newFav = {
                     name: selectedStationName,
                     filters: activeFilters,
                     showTrams: settings.showTrams,
                     showBuses: settings.showBuses
                 };
-                localStorage.setItem('zet_favorite_station', JSON.stringify(fav));
-                checkFavorite(); 
+
+                // Provjeri postoji li već (po imenu)
+                const existingIndex = favoritesList.findIndex(f => f.name === selectedStationName);
+
+                if (existingIndex >= 0) {
+                    // Ažuriraj postojeći
+                    favoritesList[existingIndex] = newFav;
+                    localStorage.setItem('zet_favorites_list', JSON.stringify(favoritesList));
+                    renderFavoritesUI();
+                } else {
+                    // Dodaj novi ako ima mjesta
+                    if (favoritesList.length >= 5) {
+                        alert("Moguće je spremiti maksimalno 5 favorita! Obrišite neki prije spremanja novog.");
+                        // Ne spremamo, ali nastavljamo s pokretanjem displaya
+                    } else {
+                        favoritesList.push(newFav);
+                        localStorage.setItem('zet_favorites_list', JSON.stringify(favoritesList));
+                        renderFavoritesUI();
+                    }
+                }
             }
             
             let newUrl = `?station=${encodeURIComponent(selectedStationName)}`;
@@ -837,29 +912,23 @@
             return num < 100;
         }
 
-function renderBoard(data) {
+        function renderBoard(data) {
             const tbody = document.getElementById('board');
             tbody.innerHTML = '';
             
-            // --- 1. FILTRIRANJE DUPLIKATA (NOVO) ---
-            // Ponekad ZET šalje iste linije dvaput. Ovo ih čisti.
             const uniqueData = [];
             const seen = new Set();
 
             data.forEach(d => {
-                // Stvaramo jedinstveni "potpis" za svaki red (Linija + Smjer + Vrijeme)
                 const signature = `${d.linija}-${d.smjer}-${d.time}-${d.min}`;
-                
                 if (!seen.has(signature)) {
                     seen.add(signature);
                     uniqueData.push(d);
                 }
             });
-            // Sada koristimo očišćenu listu (uniqueData) umjesto sirove (data)
             
             let filteredData = uniqueData; 
             
-            // --- 2. FILTRIRANJE PO TVOJIM POSTAVKAMA ---
             if (activeFilters.length > 0) {
                 filteredData = filteredData.filter(d => activeFilters.includes(d.smjer));
             }
@@ -871,7 +940,6 @@ function renderBoard(data) {
                 return false;
             });
 
-            // --- 3. PRIKAZ ---
             if (filteredData.length === 0) {
                 document.getElementById('msg-box').style.display = 'block';
                 if (uniqueData.length > 0) {
