@@ -1,5 +1,5 @@
 // OVDJE MIJENJAŠ VERZIJU - Svaki put kad nešto promijeniš u kodu, digni ovaj broj (npr. v1.2)
-const CACHE_NAME = 'zgledaj-v1.1';
+const CACHE_NAME = 'zgledaj-v1.1.1';
 
 const ASSETS_TO_CACHE = [
   '/',
