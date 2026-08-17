@@ -383,4 +383,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
     await initializeSystem();
     console.log(`🚀 FINAL SERVER ONLINE: ${PORT}`);
-});oke,
+});
