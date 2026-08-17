@@ -72,21 +72,31 @@ function deg2rad(deg) { return deg * (Math.PI/180); }
 // --- GTFS LOGIKA ---
 
 async function downloadAndUnzipGTFS() {
-    console.log("📥 [SYSTEM] Preuzimam GTFS...");
+    console.log("📥 [SYSTEM] Preuzimam GTFS na disk...");
     try {
         const response = await fetch(ZET_GTFS_ZIP);
         if (!response.ok) throw new Error(response.statusText);
-        const buffer = Buffer.from(await response.arrayBuffer());
-        const zip = new AdmZip(buffer);
         
+        // Spremamo zip direktno na disk umjesto u RAM
+        const fileStream = fs.createWriteStream("gtfs_temp.zip");
+        await new Promise((resolve, reject) => {
+            response.body.pipe(fileStream);
+            response.body.on("error", reject);
+            fileStream.on("finish", resolve);
+        });
+
+        const zip = new AdmZip("gtfs_temp.zip");
         zip.extractEntryTo("routes.txt", "./", false, true);
         zip.extractEntryTo("stops.txt", "./", false, true);
         zip.extractEntryTo("trips.txt", "./", false, true);
         zip.extractEntryTo("calendar.txt", "./", false, true);
         zip.extractEntryTo("calendar_dates.txt", "./", false, true);
         zip.extractEntryTo("stop_times.txt", "./", false, true);
+
+        // Brišemo privremeni zip fajl
+        fs.unlinkSync("gtfs_temp.zip");
         
-        console.log("📦 [SYSTEM] GTFS raspakiran.");
+        console.log("📦 [SYSTEM] GTFS raspakiran bez opterećenja RAM-a.");
         return true;
     } catch (e) {
         console.error("❌ [ERROR] Download:", e.message);
