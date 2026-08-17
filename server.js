@@ -20,7 +20,7 @@ const ZET_GTFS_ZIP = 'https://www.zet.hr/gtfs-scheduled/latest';
 // --- MEMORIJA ---
 let staticSchedule = {}; 
 let stationList = [];
-let stationLocations = {}; // NOVO: Pamtimo koordinate stanica
+let stationLocations = {};
 let routesMap = {};
 let cachedLiveData = null;
 let lastLiveFetch = 0;
@@ -48,9 +48,9 @@ function getCurrentDateStr() {
     return `${yyyy}${mm}${dd}`;
 }
 
-// Haversine formula za udaljenost (u metrima)
+// Haversine formula za udaljenost (u km)
 function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
-    var R = 6371; // Radius zemlje u km
+    var R = 6371;
     var dLat = deg2rad(lat2-lat1);  
     var dLon = deg2rad(lon2-lon1); 
     var a = 
@@ -61,7 +61,7 @@ function getDistanceFromLatLonInKm(lat1, lon1, lat2, lon2) {
     return d;
 }
 
-function deg2rad(deg) { return deg * (Math.PI/180) }
+function deg2rad(deg) { return deg * (Math.PI/180); }
 
 // --- GTFS LOGIKA ---
 
@@ -135,7 +135,7 @@ async function loadGtfsFilesToMemory() {
     let stopsIdToName = {};
     staticSchedule = {};
     stationList = [];
-    stationLocations = {}; // Reset
+    stationLocations = {};
 
     routes.forEach(r => routesMap[r.route_id] = r.route_short_name);
 
@@ -152,26 +152,25 @@ async function loadGtfsFilesToMemory() {
         const clusters = [];
 
         stopsGroup.forEach(s => {
-             const lat = parseFloat(s.stop_lat);
-             const lon = parseFloat(s.stop_lon);
-             let added = false;
-             for(let cluster of clusters) {
-                 const cLat = parseFloat(cluster[0].stop_lat);
-                 const cLon = parseFloat(cluster[0].stop_lon);
-                 if (Math.abs(lat - cLat) < 0.02 && Math.abs(lon - cLon) < 0.02) { 
-                     cluster.push(s);
-                     added = true;
-                     break;
-                 }
-             }
-             if(!added) clusters.push([s]);
+            const lat = parseFloat(s.stop_lat);
+            const lon = parseFloat(s.stop_lon);
+            let added = false;
+            for (let cluster of clusters) {
+                const cLat = parseFloat(cluster[0].stop_lat);
+                const cLon = parseFloat(cluster[0].stop_lon);
+                if (Math.abs(lat - cLat) < 0.02 && Math.abs(lon - cLon) < 0.02) { 
+                    cluster.push(s);
+                    added = true;
+                    break;
+                }
+            }
+            if (!added) clusters.push([s]);
         });
 
         clusters.forEach((cluster, index) => {
             let finalName = name;
             if (clusters.length > 1) finalName = `${name} (${index + 1})`;
 
-            // Spremi lokaciju (uzimamo koordinate prve stanice u grupi kao referencu)
             if (!stationLocations[finalName]) {
                 stationLocations[finalName] = {
                     lat: parseFloat(cluster[0].stop_lat),
@@ -180,11 +179,11 @@ async function loadGtfsFilesToMemory() {
             }
 
             cluster.forEach(s => {
-                 stopsIdToName[s.stop_id] = finalName;
-                 if (!staticSchedule[finalName]) {
-                     staticSchedule[finalName] = [];
-                     stationList.push(finalName);
-                 }
+                stopsIdToName[s.stop_id] = finalName;
+                if (!staticSchedule[finalName]) {
+                    staticSchedule[finalName] = [];
+                    stationList.push(finalName);
+                }
             });
         });
     }
@@ -204,7 +203,7 @@ async function loadGtfsFilesToMemory() {
     const rl = readline.createInterface({ input: fileStream, crlfDelay: Infinity });
 
     let isFirst = true;
-    let idxTrip=0, idxTime=2, idxStop=3;
+    let idxTrip = 0, idxTime = 2, idxStop = 3;
 
     for await (const line of rl) {
         if (isFirst) {
@@ -212,7 +211,8 @@ async function loadGtfsFilesToMemory() {
             idxTrip = headers.indexOf('trip_id');
             idxTime = headers.indexOf('departure_time');
             idxStop = headers.indexOf('stop_id');
-            isFirst = false; continue;
+            isFirst = false; 
+            continue;
         }
         const cols = line.split(','); 
         const tripId = cols[idxTrip].replace(/"/g, '');
@@ -249,7 +249,7 @@ function scheduleNextUpdate() {
     if (now > nextUpdate) nextUpdate.setDate(nextUpdate.getDate() + 1);
     const delay = nextUpdate - now;
     setTimeout(async () => {
-        if(await downloadAndUnzipGTFS()) await loadGtfsFilesToMemory();
+        if (await downloadAndUnzipGTFS()) await loadGtfsFilesToMemory();
         scheduleNextUpdate();
     }, delay);
 }
@@ -261,30 +261,43 @@ async function initializeSystem() {
 }
 
 const agent = new https.Agent({ rejectUnauthorized: false, keepAlive: true, timeout: 30000 });
+
 async function getLiveFeed() {
     const now = Date.now();
     if (cachedLiveData && (now - lastLiveFetch < 8000)) return cachedLiveData;
     try {
-        const response = await fetch(ZET_RT_URL, { agent, headers: { 'User-Agent': 'node-fetch' } });
-        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const response = await fetch(ZET_RT_URL, { 
+            agent, 
+            headers: { 
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36' 
+            } 
+        });
+        
+        if (!response.ok) throw new Error(`HTTP ${response.status} - ZET odbija vezu!`);
+        
         const buffer = await response.arrayBuffer();
         const feed = GtfsRealtimeBindings.transit_realtime.FeedMessage.decode(new Uint8Array(buffer));
         const liveMap = {};
+        
         feed.entity.forEach(e => {
             if (e.tripUpdate && e.tripUpdate.stopTimeUpdate && e.tripUpdate.stopTimeUpdate.length > 0) {
                 const stu = e.tripUpdate.stopTimeUpdate[0];
                 liveMap[e.tripUpdate.trip.tripId] = stu.departure?.delay || stu.arrival?.delay || 0;
             }
         });
+        
         cachedLiveData = liveMap;
         lastLiveFetch = now;
         return liveMap;
-    } catch (e) { return {}; }
+    } catch (e) { 
+        console.error("❌ [LIVE ERROR]:", e.message);
+        return {}; 
+    }
 }
 
 app.get('/api/stations', (req, res) => res.json(stationList));
 
-// NOVI ENDPOINT ZA GPS LOKACIJU
+// ENDPOINT ZA GPS LOKACIJU
 app.get('/api/nearest', (req, res) => {
     const { lat, lon } = req.query;
     if (!lat || !lon) return res.status(400).json({ error: "No coordinates" });
@@ -303,7 +316,6 @@ app.get('/api/nearest', (req, res) => {
         }
     }
     
-    // Vraćamo samo ako je bliže od 5km, inače nema smisla
     if (closestStation && minDist < 5) {
         res.json({ name: closestStation, distance: minDist });
     } else {
@@ -354,8 +366,11 @@ app.get('/api/board', async (req, res) => {
             const minutesUntil = finalTimeMin - searchMinutes;
             if (minutesUntil >= -2) {
                 board.push({
-                    linija: trip.linija, smjer: trip.smjer,
-                    min: minutesUntil, time: minutesToTime(finalTimeMin), status: status
+                    linija: trip.linija, 
+                    smjer: trip.smjer,
+                    min: minutesUntil, 
+                    time: minutesToTime(finalTimeMin), 
+                    status: status
                 });
             }
         }
@@ -368,4 +383,4 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, async () => {
     await initializeSystem();
     console.log(`🚀 FINAL SERVER ONLINE: ${PORT}`);
-});
+});oke,
