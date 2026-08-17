@@ -10,7 +10,12 @@ const GtfsRealtimeBindings = require('gtfs-realtime-bindings');
 const fetch = (...args) => import('node-fetch').then(({default: fetch}) => fetch(...args));
 
 const app = express();
-app.use(cors());
+
+// Ako želiš zaključati API samo na svoju domenu, odkomentiraj i prilagodi ovo:
+// const allowedOrigins = ['https://zgledaj.onrender.com', 'http://localhost:3000'];
+// app.use(cors({ origin: allowedOrigins }));
+app.use(cors()); // Trenutno otvoreno za sve
+
 app.use(express.static(path.join(__dirname, 'public')));
 
 // --- KONFIGURACIJA ---
@@ -25,6 +30,7 @@ let routesMap = {};
 let cachedLiveData = null;
 let lastLiveFetch = 0;
 let loadedDateStr = ""; 
+let isUpdating = false; // OSIGURAČ: Sprječava duplo preuzimanje baze u 04:00
 
 // Pomoćne funkcije
 function timeToMinutes(timeStr) {
@@ -124,6 +130,13 @@ function getActiveServiceIds() {
 
 async function loadGtfsFilesToMemory() {
     console.log("🔄 [SYSTEM] Gradim bazu...");
+    
+    // Odmah isprazni staru bazu da prepoloviš potrošnju RAM-a
+    staticSchedule = {};
+    stationLocations = {};
+    stationList = [];
+    routesMap = {};
+    
     loadedDateStr = getCurrentDateStr();
 
     const readCsv = (f) => Papa.parse(fs.readFileSync(f, 'utf8'), { header: true, skipEmptyLines: true }).data;
@@ -139,7 +152,6 @@ async function loadGtfsFilesToMemory() {
 
     routes.forEach(r => routesMap[r.route_id] = r.route_short_name);
 
-    // GRUPIRANJE STANICA
     const stopsByName = {};
     stops.forEach(s => {
         const name = s.stop_name ? s.stop_name.trim() : "NEPOZNATA";
@@ -239,25 +251,14 @@ async function loadGtfsFilesToMemory() {
         staticSchedule[station].sort((a, b) => a.timeMin - b.timeMin);
     }
     console.log(`✅ [SYSTEM] Baza spremna!`);
+    
+    // Nasilno izbacivanje smeća iz RAM-a (radi samo ako se pokrene s node --expose-gc server.js)
     if (global.gc) global.gc(); 
-}
-
-function scheduleNextUpdate() {
-    const now = new Date(new Date().toLocaleString("en-US", {timeZone: "Europe/Zagreb"}));
-    let nextUpdate = new Date(now);
-    nextUpdate.setHours(4, 0, 0, 0);
-    if (now > nextUpdate) nextUpdate.setDate(nextUpdate.getDate() + 1);
-    const delay = nextUpdate - now;
-    setTimeout(async () => {
-        if (await downloadAndUnzipGTFS()) await loadGtfsFilesToMemory();
-        scheduleNextUpdate();
-    }, delay);
 }
 
 async function initializeSystem() {
     await downloadAndUnzipGTFS();
     await loadGtfsFilesToMemory();
-    scheduleNextUpdate(); 
 }
 
 const agent = new https.Agent({ rejectUnauthorized: false, keepAlive: true, timeout: 30000 });
@@ -337,9 +338,13 @@ app.get('/api/destinations', (req, res) => {
 app.get('/api/board', async (req, res) => {
     const todayStr = getCurrentDateStr();
     const now = new Date(new Date().toLocaleString("en-US", {timeZone: "Europe/Zagreb"}));
-    if (now.getHours() >= 4 && loadedDateStr !== "" && loadedDateStr !== todayStr) {
-        loadedDateStr = todayStr; 
-        downloadAndUnzipGTFS().then(() => loadGtfsFilesToMemory());
+    
+    // Ažuriranje baze uz provjeru da se ne pokrene dvaput
+    if (now.getHours() >= 4 && loadedDateStr !== "" && loadedDateStr !== todayStr && !isUpdating) {
+        isUpdating = true;
+        downloadAndUnzipGTFS()
+            .then(() => loadGtfsFilesToMemory())
+            .finally(() => isUpdating = false);
     }
 
     const stationQuery = req.query.station;
@@ -376,7 +381,9 @@ app.get('/api/board', async (req, res) => {
         }
     }
     board.sort((a, b) => a.min - b.min);
-    res.json(board.slice(0, 15)); 
+    
+    // Šaljemo sve podatke - frontend će ih rezati ovisno o postavkama korisnika
+    res.json(board); 
 });
 
 const PORT = process.env.PORT || 3000;

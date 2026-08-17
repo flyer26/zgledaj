@@ -2,3 +2,4 @@ node_modules
 .env
 *.zip
 *.txt
+*.7z
